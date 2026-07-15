@@ -1,0 +1,107 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+enum MediaType {
+  MOVIE
+  TV
+}
+
+model User {
+  id            String    @id @default(cuid())
+  username      String    @unique
+  email         String    @unique
+  passwordHash  String
+  displayName   String?
+  bio           String?
+  avatarColor   String    @default("#6d28d9")
+  createdAt     DateTime  @default(now())
+
+  watchEntries  WatchEntry[]
+  lists         List[]
+  favorites     Favorite[]
+
+  @@index([email])
+}
+
+// A cached, lightweight copy of a TMDB movie/show so we can relate
+// local data (logs, list items, favorites) to it without re-fetching.
+model Title {
+  id           String    @id @default(cuid())
+  tmdbId       Int
+  mediaType    MediaType
+  name         String
+  posterPath   String?
+  backdropPath String?
+  releaseDate  String?
+  overview     String?
+  voteAverage  Float?
+  genres       String?   // comma separated genre names, cached at first sight
+
+  watchEntries WatchEntry[]
+  listItems    ListItem[]
+  favorites    Favorite[]
+
+  @@unique([tmdbId, mediaType])
+}
+
+model WatchEntry {
+  id        String   @id @default(cuid())
+  userId    String
+  titleId   String
+  rating    Int?     // 1-10 (half-star granularity via 1-10 scale)
+  review    String?
+  watchedOn DateTime @default(now())
+  rewatch   Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title Title @relation(fields: [titleId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([titleId])
+}
+
+model List {
+  id          String   @id @default(cuid())
+  userId      String
+  name        String
+  description String?
+  isWatchlist Boolean  @default(false) // true for the auto-created default watchlist
+  createdAt   DateTime @default(now())
+
+  user  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items ListItem[]
+
+  @@index([userId])
+}
+
+model ListItem {
+  id        String   @id @default(cuid())
+  listId    String
+  titleId   String
+  addedAt   DateTime @default(now())
+
+  list  List  @relation(fields: [listId], references: [id], onDelete: Cascade)
+  title Title @relation(fields: [titleId], references: [id], onDelete: Cascade)
+
+  @@unique([listId, titleId])
+}
+
+model Favorite {
+  id      String @id @default(cuid())
+  userId  String
+  titleId String
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title Title @relation(fields: [titleId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, titleId])
+}
